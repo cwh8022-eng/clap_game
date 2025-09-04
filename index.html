@@ -56,6 +56,17 @@
             margin-bottom: 5px;
             color: var(--primary-color);
         }
+        
+        .timer-container {
+            margin-top: 20px;
+        }
+        
+        #timer {
+            font-size: 3em;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
 
         p {
             font-size: 1.2em;
@@ -120,8 +131,11 @@
 
     <div class="container">
         <h1>拍手計數挑戰！</h1>
-        <p>準備好了嗎？點擊開始，然後用力拍手吧！</p>
-        <div id="status">準備中...</div>
+        <p>請在 30 秒內完成 20 次拍手！</p>
+        <div class="timer-container">
+            <div id="status">準備中...</div>
+            <div id="timer">30</div>
+        </div>
         <div id="counter">0</div>
         <div id="message"></div>
         <div class="button-wrapper">
@@ -138,7 +152,9 @@
         let totalClaps = 0;
         let isGameActive = false;
         let lastClapTime = 0;
-        
+        let timeLeft = 30; // 初始倒數秒數
+        let timerInterval;
+
         const CLAP_INTERVAL_MS = 300;
         const GOAL = 20;
         const THRESHOLD = 0.9;
@@ -152,12 +168,24 @@
             await recognizer.ensureModelLoaded();
             classLabels = recognizer.wordLabels();
         }
+        
+        // 啟動計時器
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById("timer").innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endGame("time_out");
+                }
+            }, 1000);
+        }
 
         // 啟動遊戲
         async function startClapGame() {
             document.getElementById("startButton").disabled = true;
             document.getElementById("message").innerText = "";
-
+            
             if (!recognizer) {
                 document.getElementById("status").innerText = "正在載入模型，請稍候...";
                 await createModel();
@@ -165,8 +193,12 @@
 
             isGameActive = true;
             totalClaps = 0;
+            timeLeft = 30;
             document.getElementById("counter").innerText = "0";
+            document.getElementById("timer").innerText = timeLeft;
             document.getElementById("status").innerText = "遊戲進行中，拍手吧！";
+            
+            startTimer();
 
             // 啟動聲音監聽
             recognizer.listen(result => {
@@ -191,7 +223,7 @@
                         }, 200);
 
                         if (totalClaps >= GOAL) {
-                            endGame();
+                            endGame("goal_reached");
                         }
                     }
                 }
@@ -201,11 +233,19 @@
             });
         }
 
-        function endGame() {
+        function endGame(reason) {
             isGameActive = false;
             recognizer.stopListening();
-            document.getElementById("status").innerText = "挑戰完成！";
-            document.getElementById("message").innerText = `恭喜您，拍手達 ${GOAL} 次！`;
+            clearInterval(timerInterval);
+            
+            if (reason === "goal_reached") {
+                document.getElementById("status").innerText = "挑戰成功！";
+                document.getElementById("message").innerText = `恭喜您，在 ${30 - timeLeft} 秒內達成了 ${GOAL} 次！`;
+            } else if (reason === "time_out") {
+                document.getElementById("status").innerText = "時間到！";
+                document.getElementById("message").innerText = `很可惜，您只完成了 ${totalClaps} 次。`;
+            }
+
             const startButton = document.getElementById("startButton");
             startButton.innerText = "再玩一次";
             startButton.disabled = false;
